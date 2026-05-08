@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird - Warp Speed Edition</title>
+</head>
+<body>
+<script>
+// 1. Fullscreen Setup & Canvas
+document.body.style.margin = '0';
+document.body.style.overflow = 'hidden';
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+window.onresize = resize; resize();
+Object.assign(canvas.style, { position: 'fixed', inset: '0', zIndex: '10000', background: '#000', cursor: 'none' });
+document.body.appendChild(canvas);
+
+// 2. Game State
+let birdY = canvas.height / 2, birdV = 0, gravity = 0.6, jump = -10;
+let pipes = [], frame = 0, score = 0, trail = [], flash = 0;
+let mod_godMode = true, mod_speed = 5, mod_rainbow = true;
+let multiplier = 1;
+
+// 3. Mod Menu UI
+const menu = document.createElement('div');
+Object.assign(menu.style, {
+    position: 'fixed', top: '20px', left: '20px', zIndex: '10001', padding: '15px',
+    background: 'rgba(0,0,0,0.9)', border: '2px solid #0ff', borderRadius: '10px',
+    color: '#0ff', fontFamily: 'monospace', boxShadow: '0 0 20px #0ff'
+});
+menu.innerHTML = `
+    <div style="color:#f0f; font-weight:bold; margin-bottom:10px">SCORE MULTIPLIER MOD</div>
+    <label><input type="checkbox" id="godToggle" checked> GOD MODE</label><br>
+    <label><input type="checkbox" id="rainToggle" checked> RAINBOW TRAIL</label><br><br>
+    <label>WARP SPEED: <span id="speedVal">5</span></label><br>
+    <input type="range" id="speedRange" min="1" max="1000" value="5" style="width:100%"><br><br>
+    <div id="multDisplay" style="color:#fff; font-size:18px">X1 MULTIPLIER</div>
+`;
+document.body.appendChild(menu);
+
+document.getElementById('godToggle').onchange = (e) => mod_godMode = e.target.checked;
+document.getElementById('rainToggle').onchange = (e) => mod_rainbow = e.target.checked;
+document.getElementById('speedRange').oninput = (e) => {
+    mod_speed = parseInt(e.target.value);
+    document.getElementById('speedVal').innerText = mod_speed;
+    // Calculate Multiplier: Higher speed = higher base multiplier
+    multiplier = Math.max(1, Math.floor(mod_speed / 10));
+    document.getElementById('multDisplay').innerText = `X${multiplier} MULTIPLIER`;
+};
+
+// 4. Game Loop
+function loop() {
+    ctx.fillStyle = flash > 0 ? `rgba(0, 255, 255, ${flash})` : 'rgba(0, 0, 0, 0.2)';
+    if (flash > 0) flash -= 0.05;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let birdX = canvas.width / 2;
+    birdV += gravity; birdY += birdV;
+
+    // Boundaries
+    if (birdY > canvas.height) { birdY = canvas.height; birdV = -8; }
+    if (birdY < 0) { birdY = 0; birdV = 2; }
+
+    // Rainbow Trail
+    if (mod_rainbow) {
+        trail.push({y: birdY, hue: frame % 360});
+        if (trail.length > 25) trail.shift();
+        trail.forEach((t, i) => {
+            ctx.fillStyle = `hsla(${t.hue}, 100%, 50%, ${i/25})`;
+            ctx.fillRect(birdX - (25-i)*(mod_speed/4), t.y, 20, 20);
+        });
+    }
+
+    // Bird
+    ctx.shadowBlur = 30; ctx.shadowColor = '#0ff';
+    ctx.fillStyle = '#0ff';
+    ctx.fillRect(birdX - 15, birdY - 15, 30, 30);
+
+    // Warp Pipes
+    if (frame++ % Math.max(1, Math.floor(120 / (mod_speed/5))) === 0) {
+        pipes.push({ x: canvas.width, topH: Math.random() * (canvas.height - 350) + 50, gap: 250, passed: false });
+    }
+
+    pipes.forEach((p, i) => {
+        p.x -= mod_speed;
+        let pipeW = 80 + (mod_speed / 2);
+        ctx.shadowColor = '#f0f'; ctx.fillStyle = '#f0f';
+        ctx.fillRect(p.x, 0, pipeW, p.topH);
+        ctx.fillRect(p.x, p.topH + p.gap, pipeW, canvas.height);
+
+        // Scoring + Multiplier Logic
+        if (!p.passed && p.x < birdX) {
+            score += (1 * multiplier); 
+            p.passed = true;
+            if (mod_speed > 200) flash = 0.4; // Blue flash for "Warp Score"
+        }
+    });
+
+    pipes = pipes.filter(p => p.x > -3000);
+
+    // HUD
+    ctx.shadowBlur = 10; ctx.fillStyle = '#fff'; ctx.font = 'bold 30px monospace';
+    ctx.fillText(`SCORE: ${score.toLocaleString()}`, 30, canvas.height - 40);
+    ctx.fillStyle = '#0ff';
+    ctx.fillText(`SPEED X${multiplier}`, 30, canvas.height - 80);
+
+    requestAnimationFrame(loop);
+}
+
+window.onmousedown = window.onkeydown = () => birdV = jump;
+loop();
+</script>
+</body>
+</html>
